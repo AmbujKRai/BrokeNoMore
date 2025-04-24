@@ -4,7 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  await Hive.openBox('expenseBox');
+  final expenseBox = await Hive.openBox('expenseBox');
+  await expenseBox.clear(); // Clear any corrupted data
   runApp(const MyApp());
 }
 
@@ -19,7 +20,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: const MyHomePage(title: 'BrokeNoMore'), // ← correct placement
+      home: const MyHomePage(title: 'BrokeNoMore'),
     );
   }
 }
@@ -35,10 +36,10 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final _expenseBox = Hive.box('expenseBox');
-  final List<Map<String, dynamic>> _expenses = [];
+  List<Map<String, dynamic>> _expenses = [];
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
-  String _selectedCategory = 'Food';
+  String _selectedCategory = 'Hostel mess';
   double _budget = 0;
 
   @override
@@ -50,7 +51,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _loadExpenses() {
     final savedExpenses = _expenseBox.get('expenses', defaultValue: []);
-    setState(() => _expenses.addAll(List<Map<String, dynamic>>.from(savedExpenses)));
+    setState(() {
+      _expenses = List<Map<String, dynamic>>.from(
+          savedExpenses.map((e) => Map<String, dynamic>.from(e))
+      );
+    });
   }
 
   void _saveExpenses() => _expenseBox.put('expenses', _expenses);
@@ -69,15 +74,104 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
+  void _deleteExpense(int index) {
+    setState(() {
+      _expenses.removeAt(index);
+      _saveExpenses();
+    });
+  }
+
+  void _editExpense(int index) {
+    _amountController.text = _expenses[index]['amount'].toString();
+    _selectedCategory = _expenses[index]['category'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Expense'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Amount'),
+            ),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              items: const [DropdownMenuItem(
+                value: 'Hostel mess',
+                child: Text('Hostel mess'),
+              ),
+                DropdownMenuItem(
+                  value: 'Transport',
+                  child: Text('Transport'),
+                ),
+                DropdownMenuItem(
+                  value: 'Movies',
+                  child: Text('Movies'),
+                ),
+                DropdownMenuItem(
+                  value: 'Party',
+                  child: Text('Party'),
+                ),
+                DropdownMenuItem(
+                  value: 'Toiletries',
+                  child: Text('Toiletries'),
+                ),
+                DropdownMenuItem(
+                  value: 'Bills',
+                  child: Text('Bills'),
+                ),
+              ],
+              onChanged: (value) => setState(() => _selectedCategory = value!),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _expenses[index] = {
+                  'amount': double.parse(_amountController.text),
+                  'category': _selectedCategory,
+                  'date': _expenses[index]['date'], // Keep original date
+                };
+                _saveExpenses();
+                _amountController.clear();
+                Navigator.pop(context);
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
   void _addExpense() {
-    if (_amountController.text.isEmpty) return;
+    final amount = double.tryParse(_amountController.text);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid amount')));
+      return;
+    }
+    if (!['Hostel mess', 'Transport', 'Movies', 'Party', 'Toiletries','Bills']
+        .contains(_selectedCategory)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid category selected')));
+      return;
+    }
 
     setState(() {
-      _expenses.add({
-        'amount': double.parse(_amountController.text),
+      _expenses.add(Map<String, dynamic>.from({
+        'amount': amount,
         'category': _selectedCategory,
         'date': DateTime.now().toString().split(' ')[0],
-      });
+      }));
       _saveExpenses();
       _amountController.clear();
     });
@@ -85,7 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   double _calculateBudgetProgress() {
     if (_budget <= 0) return 0;
-    double totalSpent = _expenses.fold(0, (sum, e) => sum + e['amount']);
+    double totalSpent = _expenses.fold(0, (sum, e) => sum + (e['amount'] as double));
     return (totalSpent / _budget).clamp(0, 1);
   }
 
@@ -110,9 +204,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.save),
                   onPressed: () {
-                    if (_budgetController.text.isNotEmpty) {
+                    final budget = double.tryParse(_budgetController.text);
+                    if (budget != null && budget > 0) {
                       setState(() {
-                        _budget = double.parse(_budgetController.text);
+                        _budget = budget;
                         _saveBudget();
                         _budgetController.clear();
                       });
@@ -133,7 +228,7 @@ class _MyHomePageState extends State<MyHomePage> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
-                '₹${_expenses.fold(0.0, (sum, e) => sum + e['amount']).toStringAsFixed(0)}'
+                '₹${_expenses.fold(0.0, (sum, e) => sum + (e['amount'] as double)).toStringAsFixed(0)}'
                     '/₹${_budget.toStringAsFixed(0)} spent',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
@@ -153,9 +248,12 @@ class _MyHomePageState extends State<MyHomePage> {
             DropdownButtonFormField<String>(
               value: _selectedCategory,
               items: const [
-                DropdownMenuItem(value: 'Food', child: Text('Food')),
+                DropdownMenuItem(value: 'Hostel mess', child: Text('Hostel mess')),
                 DropdownMenuItem(value: 'Transport', child: Text('Transport')),
-                DropdownMenuItem(value: 'Entertainment', child: Text('Entertainment')),
+                DropdownMenuItem(value: 'Movies', child: Text('Movies')),
+                DropdownMenuItem(value: 'Party', child: Text('Party')),
+                DropdownMenuItem(value: 'Toiletries', child: Text('Toiletries')),
+                DropdownMenuItem(value: 'Bills', child: Text('Bills')),
               ],
               onChanged: (value) => setState(() => _selectedCategory = value!),
               decoration: const InputDecoration(
@@ -171,21 +269,30 @@ class _MyHomePageState extends State<MyHomePage> {
             const SizedBox(height: 20),
 
             // Expense List
-            Expanded(
-              child: ListView.builder(
-                itemCount: _expenses.length,
-                itemBuilder: (context, index) {
-                  final expense = _expenses[index];
-                  return ListTile(
-                    leading: Icon(_getCategoryIcon(expense['category']),
-                        color: Colors.green),
-                    title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
-                    subtitle: Text(expense['category']),
-                    trailing: Text(expense['date']),
-                  );
-                },
-              ),
-            ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: _expenses.length,
+            itemBuilder: (context, index) {
+              final expense = _expenses[index];
+              return ListTile(
+                leading: Icon(_getCategoryIcon(expense['category'])),
+                title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
+                subtitle: Text(expense['category']),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(expense['date']),
+                    IconButton(
+                      onPressed: () => _deleteExpense(index),
+                      icon: const Icon(Icons.delete),
+                    ),
+                  ],
+                ),
+                onTap: () => _editExpense(index),
+              );
+            },
+          ),
+        ),
           ],
         ),
       ),
@@ -194,12 +301,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Food':
+      case 'Hostel mess':
         return Icons.restaurant;
       case 'Transport':
-        return Icons.directions_car;
-      case 'Entertainment':
+        return Icons.directions_bus;
+      case 'Movies':
         return Icons.movie;
+      case 'Party':
+        return Icons.celebration;
+      case 'Toiletries':
+        return Icons.soap;
+      case 'Bills':
+        return Icons.description;
       default:
         return Icons.money_off;
     }
