@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -152,6 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
+
   void _addExpense() {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
@@ -181,6 +183,39 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_budget <= 0) return 0;
     double totalSpent = _expenses.fold(0, (sum, e) => sum + (e['amount'] as double));
     return (totalSpent / _budget).clamp(0, 1);
+  }
+
+  // Helper method to prepare chart data
+  List<BarChartGroupData> _prepareChartData() {
+    // Group expenses by date
+    final Map<String, double> expensesByDate = {};
+    for (var expense in _expenses) {
+      final date = expense['date'] as String;
+      expensesByDate[date] = (expensesByDate[date] ?? 0) + (expense['amount'] as double);
+    }
+
+    // Convert to list and sort by date
+    final sortedDates = expensesByDate.keys.toList()..sort();
+
+    // Return bar chart data
+    return List.generate(
+      sortedDates.length,
+          (index) {
+        final date = sortedDates[index];
+        final amount = expensesByDate[date] ?? 0;
+        return BarChartGroupData(
+          x: index,
+          barRods: [
+            BarChartRodData(
+              toY: amount,
+              color: Colors.green,
+              width: 16,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -235,6 +270,53 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const Divider(),
 
+            // New Chart using fl_chart
+            Container(
+              height: 200,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: _expenses.isEmpty
+                  ? const Center(child: Text('No expenses to display'))
+                  : BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: _expenses.isEmpty
+                      ? 100
+                      : _expenses
+                      .map((e) => e['amount'] as double)
+                      .reduce((a, b) => a > b ? a : b) * 1.2,
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          if (value >= 0 && value < _prepareChartData().length) {
+                            // Show abbreviated date (e.g., "4/24")
+                            final date = _expenses[value.toInt()]['date'] as String;
+                            final parts = date.split('-');
+                            if (parts.length >= 3) {
+                              return Text('${parts[1]}/${parts[2]}');
+                            }
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: _prepareChartData(),
+                ),
+              ),
+            ),
+
+            const Divider(),
+
             // Expense Input Form
             TextField(
               controller: _amountController,
@@ -269,30 +351,30 @@ class _MyHomePageState extends State<MyHomePage> {
             const SizedBox(height: 20),
 
             // Expense List
-        Expanded(
-          child: ListView.builder(
-            itemCount: _expenses.length,
-            itemBuilder: (context, index) {
-              final expense = _expenses[index];
-              return ListTile(
-                leading: Icon(_getCategoryIcon(expense['category'])),
-                title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
-                subtitle: Text(expense['category']),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(expense['date']),
-                    IconButton(
-                      onPressed: () => _deleteExpense(index),
-                      icon: const Icon(Icons.delete),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _expenses.length,
+                itemBuilder: (context, index) {
+                  final expense = _expenses[index];
+                  return ListTile(
+                    leading: Icon(_getCategoryIcon(expense['category'])),
+                    title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
+                    subtitle: Text(expense['category']),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(expense['date']),
+                        IconButton(
+                          onPressed: () => _deleteExpense(index),
+                          icon: const Icon(Icons.delete),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                onTap: () => _editExpense(index),
-              );
-            },
-          ),
-        ),
+                    onTap: () => _editExpense(index),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
