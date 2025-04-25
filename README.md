@@ -19,21 +19,13 @@ A Flutter-based expense tracking application designed specifically for students 
 
 ## Screenshots
 
-### Main Dashboard
-![Main Dashboard](screenshots/main_dashboard.jpg)
-*Home screen showing budget progress and recent expenses*
-
-### Expense Analysis
-![Expense Analysis](screenshots/expense_analysis.jpg)
-*Pie chart and category-wise breakdown of expenses*
-
-### Recurring Expenses
-![Recurring Expenses](screenshots/recurring_expenses.jpg)
-*Manage recurring expenses and their schedules*
-
-### Receipt Scanner
-![Receipt Scanner](screenshots/receipt_scanner.jpg)
-*Scan and extract expenses from receipts*
+<div align="center">
+  <img src="screenshots/main_dashboard.jpg" width="300" alt="Dashboard">
+  <img src="screenshots/expense_analysis.jpg" width="300" alt="Analysis"> 
+  <br>
+  <img src="screenshots/recurring_expenses.jpg" width="300" alt="Recurring">
+  <img src="screenshots/receipt_scanner.jpg" width="300" alt="Scanner">
+</div>
 
 ## Technical Details
 
