@@ -22,7 +22,7 @@ class _ReceiptScannerState extends State<ReceiptScanner> {
   bool _isProcessing = false;
   String _extractedText = '';
   double? _extractedAmount;
-  String _selectedCategory = 'Hostel mess';
+  String _selectedCategory = 'Food';
 
   Future<void> _getImage(ImageSource source) async {
     try {
@@ -123,11 +123,11 @@ class _ReceiptScannerState extends State<ReceiptScanner> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'Hostel mess', child: Text('Hostel mess')),
+                      DropdownMenuItem(value: 'Food', child: Text('Food')),
                       DropdownMenuItem(value: 'Transport', child: Text('Transport')),
                       DropdownMenuItem(value: 'Movies', child: Text('Movies')),
                       DropdownMenuItem(value: 'Party', child: Text('Party')),
-                      DropdownMenuItem(value: 'Toiletries', child: Text('Toiletries')),
+                      DropdownMenuItem(value: 'Stationery', child: Text('Stationery')),
                       DropdownMenuItem(value: 'Bills', child: Text('Bills')),
                     ],
                     onChanged: (value) => setState(() => _selectedCategory = value!),

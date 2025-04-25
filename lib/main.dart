@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import 'receipt_scanner.dart';
+import 'theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   final expenseBox = await Hive.openBox('expenseBox');
   await expenseBox.clear(); // Clear any corrupted data
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -19,9 +26,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BrokeNoMore',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-      ),
+      theme: context.watch<ThemeProvider>().themeData,
       home: const MyHomePage(title: 'BrokeNoMore'),
     );
   }
@@ -41,7 +46,7 @@ class _MyHomePageState extends State<MyHomePage> {
   List<Map<String, dynamic>> _expenses = [];
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
-  String _selectedCategory = 'Hostel mess';
+  String _selectedCategory = 'Food';
   double _budget = 0;
 
   @override
@@ -102,8 +107,8 @@ class _MyHomePageState extends State<MyHomePage> {
             DropdownButtonFormField<String>(
               value: _selectedCategory,
               items: const [DropdownMenuItem(
-                value: 'Hostel mess',
-                child: Text('Hostel mess'),
+                value: 'Food',
+                child: Text('Food'),
               ),
                 DropdownMenuItem(
                   value: 'Transport',
@@ -118,8 +123,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: Text('Party'),
                 ),
                 DropdownMenuItem(
-                  value: 'Toiletries',
-                  child: Text('Toiletries'),
+                  value: 'Stationery',
+                  child: Text('Stationery'),
                 ),
                 DropdownMenuItem(
                   value: 'Bills',
@@ -162,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
           const SnackBar(content: Text('Please enter a valid amount')));
       return;
     }
-    if (!['Hostel mess', 'Transport', 'Movies', 'Party', 'Toiletries','Bills']
+    if (!['Food', 'Transport', 'Movies', 'Party', 'Stationery','Bills']
         .contains(_selectedCategory)) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid category selected')));
@@ -223,11 +228,18 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     final totalSpent = _expenses.fold(0.0, (sum, e) => sum + (e['amount'] as double));
     final progress = _calculateBudgetProgress();
-    
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => themeProvider.toggleTheme(),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -349,11 +361,11 @@ class _MyHomePageState extends State<MyHomePage> {
                         border: OutlineInputBorder(),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'Hostel mess', child: Text('Hostel mess')),
+                        DropdownMenuItem(value: 'Food', child: Text('Food')),
                         DropdownMenuItem(value: 'Transport', child: Text('Transport')),
                         DropdownMenuItem(value: 'Movies', child: Text('Movies')),
                         DropdownMenuItem(value: 'Party', child: Text('Party')),
-                        DropdownMenuItem(value: 'Toiletries', child: Text('Toiletries')),
+                        DropdownMenuItem(value: 'Stationery', child: Text('Stationery')),
                         DropdownMenuItem(value: 'Bills', child: Text('Bills')),
                       ],
                       onChanged: (value) => setState(() => _selectedCategory = value!),
@@ -427,7 +439,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Hostel mess':
+      case 'Food':
         return Icons.restaurant;
       case 'Transport':
         return Icons.directions_bus;
@@ -435,8 +447,8 @@ class _MyHomePageState extends State<MyHomePage> {
         return Icons.movie;
       case 'Party':
         return Icons.celebration;
-      case 'Toiletries':
-        return Icons.soap;
+      case 'Stationery':
+        return Icons.menu_book;
       case 'Bills':
         return Icons.description;
       default:
