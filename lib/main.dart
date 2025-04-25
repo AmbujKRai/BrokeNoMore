@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'receipt_scanner.dart';
 import 'theme_provider.dart';
+import 'expense_analysis.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -235,6 +236,17 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ExpenseAnalysis(expenses: _expenses),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: () => themeProvider.toggleTheme(),
