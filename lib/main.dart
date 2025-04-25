@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'receipt_scanner.dart';
 import 'theme_provider.dart';
@@ -84,7 +83,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final savedRecurringExpenses = _recurringBox.get('expenses', defaultValue: []);
     setState(() {
       _recurringExpenses = List<Map<String, dynamic>>.from(
-        savedRecurringExpenses.map((e) => Map<String, dynamic>.from(e)),
+        savedRecurringExpenses.map((e) => Map<String, dynamic>.from(e as Map)),
       );
     });
   }
@@ -215,37 +214,6 @@ class _MyHomePageState extends State<MyHomePage> {
     return totalSpent / _budget;
   }
 
-  List<BarChartGroupData> _prepareChartData() {
-    
-    final Map<String, double> expensesByDate = {};
-    for (var expense in _expenses) {
-      final date = expense['date'] as String;
-      expensesByDate[date] = (expensesByDate[date] ?? 0) + (expense['amount'] as double);
-    }
-
-    final sortedDates = expensesByDate.keys.toList()..sort();
-
-
-    return List.generate(
-      sortedDates.length,
-          (index) {
-        final date = sortedDates[index];
-        final amount = expensesByDate[date] ?? 0;
-        return BarChartGroupData(
-          x: index,
-          barRods: [
-            BarChartRodData(
-              toY: amount,
-              color: Colors.green,
-              width: 16,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final totalSpent = _expenses.fold(0.0, (sum, e) => sum + (e['amount'] as double));
@@ -291,7 +259,6 @@ class _MyHomePageState extends State<MyHomePage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-
               TextField(
                 controller: _budgetController,
                 keyboardType: TextInputType.number,
@@ -314,7 +281,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -337,147 +303,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               const Divider(),
-
-              Container(
-                height: 200,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: _expenses.isEmpty
-                    ? const Center(child: Text('No expenses to display'))
-                    : BarChart(
-                        BarChartData(
-                          alignment: BarChartAlignment.spaceAround,
-                          maxY: _expenses.isEmpty
-                              ? 100
-                              : _expenses
-                                  .map((e) => e['amount'] as double)
-                                  .reduce((a, b) => a > b ? a : b) * 1.2,
-                          titlesData: FlTitlesData(
-                            show: true,
-                            rightTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            topTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                getTitlesWidget: (value, meta) {
-                                  if (value >= 0 && value < _prepareChartData().length) {
-                                    final date = _expenses[value.toInt()]['date'] as String;
-                                    final parts = date.split('-');
-                                    if (parts.length >= 3) {
-                                      return Text('${parts[1]}/${parts[2]}');
-                                    }
-                                  }
-                                  return const Text('');
-                                },
-                              ),
-                            ),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          barGroups: _prepareChartData(),
-                        ),
-                      ),
-              ),
-              const Divider(),
-
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Food', child: Text('Food')),
-                        DropdownMenuItem(value: 'Transport', child: Text('Transport')),
-                        DropdownMenuItem(value: 'Movies', child: Text('Movies')),
-                        DropdownMenuItem(value: 'Party', child: Text('Party')),
-                        DropdownMenuItem(value: 'Stationery', child: Text('Stationery')),
-                        DropdownMenuItem(value: 'Bills', child: Text('Bills')),
-                      ],
-                      onChanged: (value) => setState(() => _selectedCategory = value!),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: _addExpense,
-                    child: const Text('Add'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ReceiptScanner(
-                        onExpenseExtracted: (amount, category) {
-                          setState(() {
-                            _expenses.add({
-                              'amount': amount,
-                              'category': category,
-                              'date': DateTime.now().toString().split(' ')[0],
-                            });
-                            _saveExpenses();
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.document_scanner),
-                label: const Text('Scan Receipt'),
-              ),
-              const SizedBox(height: 16),
-
-              Container(
-                height: 200,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _expenses.length,
-                  itemBuilder: (context, index) {
-                    final expense = _expenses[index];
-                    return ListTile(
-                      leading: Icon(_getCategoryIcon(expense['category'])),
-                      title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
-                      subtitle: Text(expense['category']),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(expense['date']),
-                          IconButton(
-                            onPressed: () => _deleteExpense(index),
-                            icon: const Icon(Icons.delete),
-                          ),
-                        ],
-                      ),
-                      onTap: () => _editExpense(index),
-                    );
-                  },
-                ),
-              ),
-
               if (upcomingRecurring.isNotEmpty) ...[
-                const Divider(),
                 const Text(
                   'Upcoming Recurring Expenses',
                   style: TextStyle(
@@ -520,7 +346,105 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   },
                 ),
+                const Divider(),
               ],
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Amount',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Food', child: Text('Food')),
+                        DropdownMenuItem(value: 'Transport', child: Text('Transport')),
+                        DropdownMenuItem(value: 'Movies', child: Text('Movies')),
+                        DropdownMenuItem(value: 'Party', child: Text('Party')),
+                        DropdownMenuItem(value: 'Stationery', child: Text('Stationery')),
+                        DropdownMenuItem(value: 'Bills', child: Text('Bills')),
+                      ],
+                      onChanged: (value) => setState(() => _selectedCategory = value!),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _addExpense,
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReceiptScanner(
+                        onExpenseExtracted: (amount, category) {
+                          setState(() {
+                            _expenses.add({
+                              'amount': amount,
+                              'category': category,
+                              'date': DateTime.now().toString().split(' ')[0],
+                            });
+                            _saveExpenses();
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.document_scanner),
+                label: const Text('Scan Receipt'),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Recent Expenses',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _expenses.length,
+                itemBuilder: (context, index) {
+                  final expense = _expenses[index];
+                  return ListTile(
+                    leading: Icon(_getCategoryIcon(expense['category'])),
+                    title: Text('₹${expense['amount'].toStringAsFixed(0)}'),
+                    subtitle: Text(expense['category']),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(expense['date']),
+                        IconButton(
+                          onPressed: () => _deleteExpense(index),
+                          icon: const Icon(Icons.delete),
+                        ),
+                      ],
+                    ),
+                    onTap: () => _editExpense(index),
+                  );
+                },
+              ),
             ],
           ),
         ),

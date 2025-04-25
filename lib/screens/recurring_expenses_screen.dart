@@ -46,7 +46,7 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
     );
 
     final expenses = List<Map<String, dynamic>>.from(
-      _recurringBox.get('expenses', defaultValue: []),
+      _recurringBox.get('expenses', defaultValue: []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
     expenses.add(expense.toMap());
     _recurringBox.put('expenses', expenses);
@@ -58,7 +58,7 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
 
   void _deleteRecurringExpense(int index) {
     final expenses = List<Map<String, dynamic>>.from(
-      _recurringBox.get('expenses', defaultValue: []),
+      _recurringBox.get('expenses', defaultValue: []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
     expenses.removeAt(index);
     _recurringBox.put('expenses', expenses);
@@ -67,7 +67,7 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
 
   void _toggleExpenseStatus(int index) {
     final expenses = List<Map<String, dynamic>>.from(
-      _recurringBox.get('expenses', defaultValue: []),
+      _recurringBox.get('expenses', defaultValue: []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
     final expense = RecurringExpense.fromMap(expenses[index]);
     expenses[index] = RecurringExpense(
@@ -87,7 +87,7 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     final expenses = List<Map<String, dynamic>>.from(
-      _recurringBox.get('expenses', defaultValue: []),
+      _recurringBox.get('expenses', defaultValue: []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
 
     return Scaffold(
