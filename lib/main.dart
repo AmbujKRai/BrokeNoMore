@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import 'receipt_scanner.dart';
 import 'theme_provider.dart';
 import 'expense_analysis.dart';
+import 'screens/recurring_expenses_screen.dart';
+import 'models/recurring_expense.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   final expenseBox = await Hive.openBox('expenseBox');
-  await expenseBox.clear(); // Clear any corrupted data
+  final recurringBox = await Hive.openBox('recurringExpenses');
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -44,7 +46,9 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final _expenseBox = Hive.box('expenseBox');
+  final _recurringBox = Hive.box('recurringExpenses');
   List<Map<String, dynamic>> _expenses = [];
+  List<Map<String, dynamic>> _recurringExpenses = [];
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
   String _selectedCategory = 'Food';
@@ -55,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _loadExpenses();
     _loadBudget();
+    _loadRecurringExpenses();
   }
 
   void _loadExpenses() {
@@ -74,6 +79,24 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _saveBudget() => _expenseBox.put('budget', _budget);
+
+  void _loadRecurringExpenses() {
+    final savedRecurringExpenses = _recurringBox.get('expenses', defaultValue: []);
+    setState(() {
+      _recurringExpenses = List<Map<String, dynamic>>.from(
+        savedRecurringExpenses.map((e) => Map<String, dynamic>.from(e)),
+      );
+    });
+  }
+
+  List<RecurringExpense> _getUpcomingRecurringExpenses() {
+    final now = DateTime.now();
+    return _recurringExpenses
+        .map((e) => RecurringExpense.fromMap(e))
+        .where((e) => e.isActive && e.nextDueDate.isAfter(now))
+        .toList()
+      ..sort((a, b) => a.nextDueDate.compareTo(b.nextDueDate));
+  }
 
   @override
   void dispose() {
@@ -147,7 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 _expenses[index] = {
                   'amount': double.parse(_amountController.text),
                   'category': _selectedCategory,
-                  'date': _expenses[index]['date'], // Keep original date
+                  'date': _expenses[index]['date'],
                 };
                 _saveExpenses();
                 _amountController.clear();
@@ -192,19 +215,17 @@ class _MyHomePageState extends State<MyHomePage> {
     return totalSpent / _budget;
   }
 
-  // Helper method to prepare chart data
   List<BarChartGroupData> _prepareChartData() {
-    // Group expenses by date
+    
     final Map<String, double> expensesByDate = {};
     for (var expense in _expenses) {
       final date = expense['date'] as String;
       expensesByDate[date] = (expensesByDate[date] ?? 0) + (expense['amount'] as double);
     }
 
-    // Convert to list and sort by date
     final sortedDates = expensesByDate.keys.toList()..sort();
 
-    // Return bar chart data
+
     return List.generate(
       sortedDates.length,
           (index) {
@@ -230,12 +251,24 @@ class _MyHomePageState extends State<MyHomePage> {
     final totalSpent = _expenses.fold(0.0, (sum, e) => sum + (e['amount'] as double));
     final progress = _calculateBudgetProgress();
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final upcomingRecurring = _getUpcomingRecurringExpenses();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.repeat),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RecurringExpensesScreen(),
+                ),
+              ).then((_) => setState(() => _loadRecurringExpenses()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.analytics),
             onPressed: () {
@@ -258,7 +291,7 @@ class _MyHomePageState extends State<MyHomePage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              // Budget Input
+
               TextField(
                 controller: _budgetController,
                 keyboardType: TextInputType.number,
@@ -281,7 +314,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Budget Progress
+
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -304,7 +337,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               const Divider(),
-              // Chart
+
               Container(
                 height: 200,
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -348,7 +381,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
               ),
               const Divider(),
-              // Expense Input
+
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -390,7 +423,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Scan Receipt Button
+
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -415,7 +448,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 label: const Text('Scan Receipt'),
               ),
               const SizedBox(height: 16),
-              // Expense List
+
               Container(
                 height: 200,
                 child: ListView.builder(
@@ -442,6 +475,52 @@ class _MyHomePageState extends State<MyHomePage> {
                   },
                 ),
               ),
+
+              if (upcomingRecurring.isNotEmpty) ...[
+                const Divider(),
+                const Text(
+                  'Upcoming Recurring Expenses',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: upcomingRecurring.length,
+                  itemBuilder: (context, index) {
+                    final expense = upcomingRecurring[index];
+                    return ListTile(
+                      leading: const Icon(Icons.repeat),
+                      title: Text(expense.title),
+                      subtitle: Text(
+                        'Due: ${expense.nextDueDate.toString().split(' ')[0]}\n'
+                        '${expense.frequencyText} - ₹${expense.amount.toStringAsFixed(2)}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: () {
+                          setState(() {
+                            _expenses.add({
+                              'amount': expense.amount,
+                              'category': expense.category,
+                              'date': DateTime.now().toString().split(' ')[0],
+                            });
+                            _saveExpenses();
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Expense added successfully'),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
